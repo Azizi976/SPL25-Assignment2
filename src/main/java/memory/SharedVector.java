@@ -50,14 +50,38 @@ public class SharedVector {
     }
 
     public void add(SharedVector other) {
-        // Checking if the input is valid
-        if (this.length() != other.length() || this.orientation != other.getOrientation()) {
-            throw new IllegalArgumentException("SharedVectors must have the same length and orientation");
+
+        // Making sure to check ids to prevent deadlocks
+        // Always locks the vector with the smallest id
+        int this_id = System.identityHashCode(this);
+        int other_id = System.identityHashCode(other);
+        // Case 1
+        if (this_id < other_id) {
+            this.lock.writeLock().lock();
+            other.lock.readLock().lock();
+            // Case 2
+        } else if (other_id < this_id) {
+            other.lock.readLock().lock();
+            this.lock.writeLock().lock();
+            // Case 3
+        } else {
+            this.lock.writeLock().lock();
+            other.lock.readLock().lock();
         }
 
-        // Add values of other vector to this vector
-        for (int i = 0; i < this.length(); i++) {
-            this.vector[i] = this.vector[i] + other.get(i);
+        try {
+            // Checking if the input is valid
+            if (this.length() != other.length() || this.orientation != other.getOrientation()) {
+                throw new IllegalArgumentException("SharedVectors must have the same length and orientation");
+            }
+
+            // Add values of other vector to this vector
+            for (int i = 0; i < this.length(); i++) {
+                this.vector[i] = this.vector[i] + other.get(i);
+            }
+        } finally {
+            this.lock.writeLock().unlock();
+            other.lock.readLock().unlock();
         }
     }
 
