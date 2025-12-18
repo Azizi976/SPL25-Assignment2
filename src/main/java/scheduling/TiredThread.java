@@ -7,7 +7,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TiredThread extends Thread implements Comparable<TiredThread> {
 
-    private static final Runnable POISON_PILL = () -> {}; // Special task to signal shutdown
+    private static final Runnable POISON_PILL = () -> {
+    }; // Special task to signal shutdown
 
     private final int id; // Worker index assigned by the executor
     private final double fatigueFactor; // Multiplier for fatigue calculation
@@ -17,7 +18,8 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
     // Single-slot handoff queue; executor will put tasks here
     private final BlockingQueue<Runnable> handoff = new ArrayBlockingQueue<>(1);
 
-    private final AtomicBoolean busy = new AtomicBoolean(false); // Indicates if the worker is currently executing a task
+    private final AtomicBoolean busy = new AtomicBoolean(false); // Indicates if the worker is currently executing a
+                                                                 // task
 
     private final AtomicLong timeUsed = new AtomicLong(0); // Total time spent executing tasks
     private final AtomicLong timeIdle = new AtomicLong(0); // Total time spent idle
@@ -56,7 +58,10 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
      * it throws IllegalStateException.
      */
     public void newTask(Runnable task) {
-       // TODO
+        if (this.busy.get()) {
+            throw new IllegalStateException("Worker is busy");
+        }
+        handoff.add(task);
     }
 
     /**
@@ -64,17 +69,62 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
      * Inserts a poison pill so the worker wakes up and exits.
      */
     public void shutdown() {
-       // TODO
+        this.newTask(POISON_PILL);
     }
 
     @Override
     public void run() {
-       // TODO
+        // Main worker loop - continues while thread is alive
+        while (alive.get()) {
+            try {
+                // Block and wait for a task from the executor
+                Runnable task = handoff.take();
+
+                // Calculate idle time: from when we started waiting until now
+                this.timeIdle.addAndGet(System.nanoTime() - this.idleStartTime.get());
+
+                // Check for shutdown signal
+                if (task.equals(POISON_PILL)) {
+                    return;
+                }
+
+                // Mark worker as busy before executing
+                busy.set(true);
+
+                // Record task start time for fatigue calculation
+                long taskStartTime = System.nanoTime();
+
+                // Execute the actual task
+                task.run();
+
+                // Accumulate CPU time used for fatigue calculation
+                timeUsed.addAndGet(System.nanoTime() - taskStartTime);
+
+                // Mark worker as available for new tasks
+                busy.set(false);
+
+                // Start tracking idle time from now
+                this.idleStartTime.set(System.nanoTime());
+
+            } catch (InterruptedException e) {
+                // Thread was interrupted while waiting - continue loop
+            }
+        }
     }
 
     @Override
     public int compareTo(TiredThread o) {
-        // TODO
-        return 0;
+        // -1 if the fatigue factor of this is smaller than the fatigue factor of o
+        if (this.getFatigue() < o.getFatigue()){
+            return -1;
+        }
+        // 1 if the fatigue factor of this is greater than the fatigue factor of o
+        else if (this.getFatigue() > o.getFatigue()){
+            return 1;
+        }
+        // If they are equal
+        else{
+            return 0;
+        }
     }
 }
