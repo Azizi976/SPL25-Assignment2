@@ -69,7 +69,11 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
      * Inserts a poison pill so the worker wakes up and exits.
      */
     public void shutdown() {
-        this.newTask(POISON_PILL);
+        try {
+            handoff.put(POISON_PILL);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override
@@ -115,15 +119,15 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
     @Override
     public int compareTo(TiredThread o) {
         // -1 if the fatigue factor of this is smaller than the fatigue factor of o
-        if (this.getFatigue() < o.getFatigue()){
+        if (this.getFatigue() < o.getFatigue()) {
             return -1;
         }
         // 1 if the fatigue factor of this is greater than the fatigue factor of o
-        else if (this.getFatigue() > o.getFatigue()){
+        else if (this.getFatigue() > o.getFatigue()) {
             return 1;
         }
         // If they are equal
-        else{
+        else {
             return 0;
         }
     }

@@ -43,7 +43,12 @@ public class TiredExecutor {
                 } finally {
                     // Return worker to idle queue
                     idleMinHeap.add(worker);
-                    inFlight.decrementAndGet();
+                    if (inFlight.decrementAndGet() == 0) {
+                        // Notify the main thread waiting in submitAll
+                        synchronized (this) {
+                            this.notifyAll();
+                        }
+                    }
                 }
             };
 
@@ -56,15 +61,54 @@ public class TiredExecutor {
     }
 
     public void submitAll(Iterable<Runnable> tasks) {
-        // TODO: submit tasks one by one and wait until all finish
+
+        // Submit all the tasks in the Iterable tasks
+        for (Runnable task : tasks) {
+            submit(task);
+        }
+
+        // Now we'll create the barrier that controls the main thread (executer)
+        synchronized (this) {
+            // While tasks are working the main thread is waiting
+            while (inFlight.get() > 0) {
+                try {
+                    this.wait();
+                } catch (InterruptedException e) { // If interupted throw an exception
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
     }
 
     public void shutdown() throws InterruptedException {
-        // TODO
+
+        // Shutting down every worker in workers
+        for (TiredThread workThread : workers) {
+            workThread.shutdown();
+        }
+
+        // Waiting until all workers finish their work
+        for (TiredThread workThread : workers) {
+            workThread.join();
+        }
+
     }
 
     public synchronized String getWorkerReport() {
-        // TODO: return readable statistics for each worker
-        return null;
+        StringBuilder report = new StringBuilder();
+        report.append("Worker Report:\n");
+        report.append("--------------\n");
+
+        for (TiredThread worker : workers) {
+            report.append(String.format(
+                    "Worker #%d: Fatigue=%.2f, TimeUsed=%d ms, TimeIdle=%d ms\n",
+                    worker.getWorkerId(),
+                    worker.getFatigue(),
+                    worker.getTimeUsed(),
+                    worker.getTimeIdle()));
+        }
+
+        return report.toString();
     }
 }
