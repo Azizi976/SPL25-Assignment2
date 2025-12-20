@@ -96,11 +96,13 @@ public class TiredExecutor {
     }
 
     public synchronized String getWorkerReport() {
+        // Using string builder 
         StringBuilder report = new StringBuilder();
         report.append("Worker Report:\n");
         report.append("--------------\n");
 
         for (TiredThread worker : workers) {
+            // Format the values to the report string builder
             report.append(String.format(
                     "Worker #%d: Fatigue=%.2f, TimeUsed=%d ms, TimeIdle=%d ms\n",
                     worker.getWorkerId(),
@@ -109,6 +111,7 @@ public class TiredExecutor {
                     worker.getTimeIdle()));
         }
 
+        // Return and make it a string
         return report.toString();
     }
 }

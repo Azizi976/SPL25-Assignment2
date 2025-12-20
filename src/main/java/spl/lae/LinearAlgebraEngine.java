@@ -12,12 +12,25 @@ public class LinearAlgebraEngine {
     private SharedMatrix rightMatrix = new SharedMatrix();
     private TiredExecutor executor;
 
+    // Constructor
     public LinearAlgebraEngine(int numThreads) {
-        // TODO: create executor with given thread count
+        this.executor = new TiredExecutor(numThreads);
+        this.leftMatrix = new SharedMatrix();
+        this.rightMatrix = new SharedMatrix();
     }
 
     public ComputationNode run(ComputationNode computationRoot) {
-        // TODO: resolve computation tree step by step until final matrix is produced
+        while (computationRoot.getChildren() != null){
+            // Find the first node to resolve
+            ComputationNode operator = computationRoot.findResolvable();
+
+            // Make a list of children
+            List<ComputationNode> matrixList = operator.getChildren();
+
+            // Get the matrix filed from each children
+            leftMatrix = new SharedMatrix(matrixList.get(0).getMatrix());
+            rightMatrix = new SharedMatrix(matrixList.get(1).getMatrix());
+        }
         return null;
     }
 
