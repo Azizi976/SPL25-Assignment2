@@ -56,28 +56,34 @@ public class SharedMatrix {
             return new double[0][0];
         }
 
-        // If stored as row-major, return directly
-        if (vectors[0].getOrientation() == VectorOrientation.ROW_MAJOR) {
-            double[][] result = new double[vectors.length][vectors[0].length()];
-            for (int i = 0; i < vectors.length; i++) {
-                for (int j = 0; j < vectors[i].length(); j++) {
-                    result[i][j] = vectors[i].get(j);
+        acquireAllVectorReadLocks(this.vectors);
+        try {
+            // If stored as row-major, return directly
+            if (vectors[0].getOrientation() == VectorOrientation.ROW_MAJOR) {
+                double[][] result = new double[vectors.length][vectors[0].length()];
+                for (int i = 0; i < vectors.length; i++) {
+                    for (int j = 0; j < vectors[i].length(); j++) {
+                        result[i][j] = vectors[i].get(j);
+                    }
                 }
+                return result;
             }
-            return result;
-        }
-        // If stored as column-major, transpose back to row-major
-        else {
-            int numRows = vectors[0].length();
-            int numCols = vectors.length;
-            double[][] result = new double[numRows][numCols];
-            for (int col = 0; col < numCols; col++) {
-                for (int row = 0; row < numRows; row++) {
-                    result[row][col] = vectors[col].get(row);
+            // If stored as column-major, transpose back to row-major
+            else {
+                int numRows = vectors[0].length();
+                int numCols = vectors.length;
+                double[][] result = new double[numRows][numCols];
+                for (int col = 0; col < numCols; col++) {
+                    for (int row = 0; row < numRows; row++) {
+                        result[row][col] = vectors[col].get(row);
+                    }
                 }
+                return result;
             }
-            return result;
+        } finally {
+            releaseAllVectorReadLocks(this.vectors);
         }
+
     }
 
     public SharedVector get(int index) {
