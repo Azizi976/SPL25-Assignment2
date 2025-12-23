@@ -27,7 +27,11 @@ public class Main {
         double[][] result = engine.run(root).getMatrix();
         OutputWriter.write(result, args[2]);
       }
+      
       // Handle errors
+      catch (ParseException e){
+        OutputWriter.write(e.getMessage(), args[2]);
+      }
       catch (Exception e){
         OutputWriter.write(e.getMessage(), args[2]);
       }
