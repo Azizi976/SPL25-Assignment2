@@ -89,6 +89,9 @@ public class LinearAlgebraEngine {
         if (!(leftMatrix.length() == rightMatrix.length())) {
             throw new IllegalArgumentException("Matrices should be in the same length in order to add one to another/");
         }
+        if (leftMatrix.length() > 0 && leftMatrix.get(0).length() != rightMatrix.get(0).length()) {
+            throw new IllegalArgumentException("Matrices must have the same dimensions (columns) for addition.");
+        }
 
         List<Runnable> tasks = new ArrayList<>();
         int rows = leftMatrix.length();
@@ -118,6 +121,10 @@ public class LinearAlgebraEngine {
     }
 
     public List<Runnable> createMultiplyTasks() {
+
+        if (leftMatrix.length() > 0 && leftMatrix.get(0).length() != rightMatrix.length()) {
+            throw new IllegalArgumentException("Invalid dimensions for matrix multiplication.");
+        }
 
         List<Runnable> tasks = new ArrayList<>();
         int rows = leftMatrix.length();
