@@ -42,44 +42,50 @@ public class LinearAlgebraEngine {
         // Make the corresponding task list to each operator and load children
         if (node.getNodeType() == ComputationNodeType.ADD) {
 
-            leftMatrix = new SharedMatrix(children.get(0).getMatrix());
-            rightMatrix = new SharedMatrix(children.get(1).getMatrix());
+            // Load children to corresponding matrix
+            leftMatrix.loadRowMajor(children.get(0).getMatrix());
+            rightMatrix.loadRowMajor(children.get(1).getMatrix());
 
+            // Creating tasks for addition operation
             tasks = this.createAddTasks();
-
-            // In this case we have to save the result in antoher matrix cause we have to
-            // keep both matrices alive to compute
 
         } else if (node.getNodeType() == ComputationNodeType.MULTIPLY) {
 
-            leftMatrix = new SharedMatrix(children.get(0).getMatrix());
-            rightMatrix = new SharedMatrix(children.get(1).getMatrix());
+            // Load children to corresponding matrix
+            leftMatrix.loadRowMajor(children.get(0).getMatrix());
+            rightMatrix.loadRowMajor(children.get(1).getMatrix());
 
+            // Creating tasks for multiplication operation
             tasks = this.createMultiplyTasks();
 
         } else if (node.getNodeType() == ComputationNodeType.NEGATE) {
 
-            leftMatrix = new SharedMatrix(children.get(0).getMatrix());
+            // Load child to corresponding matrix
+            leftMatrix.loadRowMajor(children.get(0).getMatrix());
 
+            // Creating tasks for negation operation
             tasks = this.createNegateTasks();
 
         } else if (node.getNodeType() == ComputationNodeType.TRANSPOSE) {
 
-            leftMatrix = new SharedMatrix(children.get(0).getMatrix());
+            // Load child to corresponding matrix
+            leftMatrix.loadRowMajor(children.get(0).getMatrix());
 
+            // Creating tasks for transpose operation
             tasks = this.createTransposeTasks();
         }
 
-        // Submitting all tasks
+        // Submitting all tasks to the executor
         executor.submitAll(tasks);
 
-        // Updating the operator node to be the result
+        // Updating the operator node to be the result from the left matrix
         node.resolve(leftMatrix.readRowMajor());
 
     }
 
     public List<Runnable> createAddTasks() {
 
+        // Validating that both matrices have the same dimensions
         if (!(leftMatrix.length() == rightMatrix.length())) {
             throw new IllegalArgumentException("Matrices should be in the same length in order to add one to another/");
         }
@@ -87,10 +93,25 @@ public class LinearAlgebraEngine {
         List<Runnable> tasks = new ArrayList<>();
         int rows = leftMatrix.length();
 
+        // Iterating over each row to create a dedicated task
         for (int i = 0; i < rows; i++) {
             int currentRow = i;
             tasks.add(() -> {
-                leftMatrix.get(currentRow).add(rightMatrix.get(currentRow));
+
+                SharedVector target = leftMatrix.get(currentRow);
+                SharedVector source = rightMatrix.get(currentRow);
+
+                // Acquiring locks to ensure thread safety
+                target.writeLock();
+                source.readLock();
+                try {
+                    // Performing vector addition
+                    target.add(source);
+                } finally {
+                    // Releasing locks in finally block to ensure they are always freed
+                    target.writeUnlock();
+                    source.readUnlock();
+                }
             });
         }
         return tasks;
@@ -100,11 +121,35 @@ public class LinearAlgebraEngine {
 
         List<Runnable> tasks = new ArrayList<>();
         int rows = leftMatrix.length();
+        int rightLen = rightMatrix.length();
 
+        // Iterating over each row to create a dedicated task
         for (int i = 0; i < rows; i++) {
             int currentRow = i;
             tasks.add(() -> {
-                leftMatrix.get(currentRow).vecMatMul(rightMatrix);
+
+                SharedVector target = leftMatrix.get(currentRow);
+
+                // Acquiring write lock for the target row
+                target.writeLock();
+
+                // Acquiring read locks for the entire right matrix since multiplication
+                // requires all of it
+                for (int k = 0; k < rightLen; k++) {
+                    rightMatrix.get(k).readLock();
+                }
+
+                try {
+                    // Performing vector-matrix multiplication
+                    target.vecMatMul(rightMatrix);
+                } finally {
+                    // Releasing read locks for the right matrix
+                    for (int k = 0; k < rightLen; k++) {
+                        rightMatrix.get(k).readUnlock();
+                    }
+                    // Releasing write lock for the target row
+                    target.writeUnlock();
+                }
             });
         }
         return tasks;
@@ -115,11 +160,22 @@ public class LinearAlgebraEngine {
         List<Runnable> tasks = new ArrayList<>();
         int rows = leftMatrix.length();
 
+        // Iterating over each row to create a dedicated task
         for (int i = 0; i < rows; i++) {
             int currentRow = i;
             tasks.add(() -> {
-                leftMatrix.get(currentRow).negate();
-                ;
+
+                SharedVector target = leftMatrix.get(currentRow);
+
+                // Acquiring write lock since we are modifying the vector
+                target.writeLock();
+                try {
+                    // Performing negation
+                    target.negate();
+                } finally {
+                    // Releasing the write lock
+                    target.writeUnlock();
+                }
             });
         }
         return tasks;
@@ -130,11 +186,22 @@ public class LinearAlgebraEngine {
         List<Runnable> tasks = new ArrayList<>();
         int rows = leftMatrix.length();
 
+        // Iterating over each row to create a dedicated task
         for (int i = 0; i < rows; i++) {
             int currentRow = i;
             tasks.add(() -> {
-                leftMatrix.get(currentRow).transpose();
-                ;
+
+                SharedVector target = leftMatrix.get(currentRow);
+
+                // Acquiring write lock since transpose modifies internal state
+                target.writeLock();
+                try {
+                    // Performing transpose
+                    target.transpose();
+                } finally {
+                    // Releasing the write lock
+                    target.writeUnlock();
+                }
             });
         }
         return tasks;
