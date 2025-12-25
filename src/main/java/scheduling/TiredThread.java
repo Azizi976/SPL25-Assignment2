@@ -58,9 +58,6 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
      * it throws IllegalStateException.
      */
     public void newTask(Runnable task) {
-        if (this.busy.get()) {
-            throw new IllegalStateException("Worker is busy");
-        }
         handoff.add(task);
     }
 

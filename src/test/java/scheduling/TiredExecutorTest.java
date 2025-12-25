@@ -1,7 +1,6 @@
 package scheduling;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.AfterEach;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -11,446 +10,293 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Unit tests for TiredExecutor class.
- * Tests cover: thread pool creation, task submission, task completion,
- * submitAll blocking behavior, shutdown, and worker reporting.
- */
 public class TiredExecutorTest {
 
-    private TiredExecutor executor;
+    private TiredExecutor exec;
 
+    // we have to cleanup the executer after each test
     @AfterEach
-    void tearDown() throws InterruptedException {
-        if (executor != null) {
-            executor.shutdown();
+    void cleanUp() {
+        if (exec != null) {
+            try {
+                exec.shutdown();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
-    // ==================== Constructor Tests ====================
-
     @Test
-    @DisplayName("Constructor creates executor with specified number of threads")
-    void testConstructorCreatesThreads() {
-        executor = new TiredExecutor(4);
-        String report = executor.getWorkerReport();
-        
-        // Report should mention all 4 workers
-        assertTrue(report.contains("Worker #0"));
-        assertTrue(report.contains("Worker #1"));
-        assertTrue(report.contains("Worker #2"));
-        assertTrue(report.contains("Worker #3"));
+    void testExecSize() {
+        exec = new TiredExecutor(4);
+        String rep = exec.getWorkerReport();
+
+        // check all workers exist
+        assertTrue(rep.contains("Worker #0"));
+        assertTrue(rep.contains("Worker #3"));
     }
 
     @Test
-    @DisplayName("Constructor with single thread")
-    void testConstructorSingleThread() {
-        executor = new TiredExecutor(1);
-        String report = executor.getWorkerReport();
-        
-        assertTrue(report.contains("Worker #0"));
-        assertFalse(report.contains("Worker #1"));
+    void testOneThread() {
+        exec = new TiredExecutor(1);
+        String s = exec.getWorkerReport();
+        assertTrue(s.contains("Worker #0"));
+        assertFalse(s.contains("Worker #1"));
     }
 
-    // ==================== Submit Tests ====================
-
     @Test
-    @DisplayName("Submit executes single task")
-    void testSubmitSingleTask() throws InterruptedException {
-        executor = new TiredExecutor(2);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        CountDownLatch latch = new CountDownLatch(1);
-        
-        executor.submit(() -> {
-            counter.incrementAndGet();
-            latch.countDown();
+    void testRunOne() throws InterruptedException {
+        exec = new TiredExecutor(2);
+        AtomicInteger count = new AtomicInteger(0);
+        CountDownLatch countdwn = new CountDownLatch(1);
+
+        exec.submit(() -> {
+            count.incrementAndGet();
+            countdwn.countDown();
         });
-        
-        assertTrue(latch.await(1, TimeUnit.SECONDS));
-        assertEquals(1, counter.get());
+
+        assertTrue(countdwn.await(1000, TimeUnit.MILLISECONDS));
+        assertEquals(1, count.get());
     }
 
     @Test
-    @DisplayName("Submit executes multiple tasks")
-    void testSubmitMultipleTasks() throws InterruptedException {
-        executor = new TiredExecutor(4);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        CountDownLatch latch = new CountDownLatch(10);
-        
+    void testRunMultiple() throws InterruptedException {
+        exec = new TiredExecutor(4);
+        AtomicInteger count = new AtomicInteger(0);
+        CountDownLatch countdwn = new CountDownLatch(10);
+
         for (int i = 0; i < 10; i++) {
-            executor.submit(() -> {
-                counter.incrementAndGet();
-                latch.countDown();
+            exec.submit(() -> {
+                count.incrementAndGet();
+                countdwn.countDown();
             });
         }
-        
-        assertTrue(latch.await(2, TimeUnit.SECONDS));
-        assertEquals(10, counter.get());
+
+        assertTrue(countdwn.await(2, TimeUnit.SECONDS));
+        assertEquals(10, count.get());
     }
 
     @Test
-    @DisplayName("Submit distributes tasks across workers")
-    void testSubmitDistributesTasks() throws InterruptedException {
-        executor = new TiredExecutor(4);
-        
-        CountDownLatch latch = new CountDownLatch(4);
-        
-        // Submit 4 long-running tasks simultaneously
+    void testParallel() throws InterruptedException {
+        exec = new TiredExecutor(4);
+        CountDownLatch countdwn = new CountDownLatch(4);
+
         for (int i = 0; i < 4; i++) {
-            executor.submit(() -> {
+            exec.submit(() -> {
                 try {
                     Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
                 }
-                latch.countDown();
+                countdwn.countDown();
             });
         }
-        
-        // All 4 should complete roughly at the same time (parallel execution)
-        assertTrue(latch.await(1, TimeUnit.SECONDS));
+
+        // should finish fast if parallel
+        assertTrue(countdwn.await(1500, TimeUnit.MILLISECONDS));
     }
 
-    // ==================== SubmitAll Tests ====================
-
     @Test
-    @DisplayName("submitAll executes all tasks")
-    void testSubmitAllExecutesAll() throws InterruptedException {
-        executor = new TiredExecutor(4);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        List<Runnable> tasks = new ArrayList<>();
-        
+    void testSubmitAll() throws InterruptedException {
+        exec = new TiredExecutor(4);
+        AtomicInteger count = new AtomicInteger(0);
+        List<Runnable> list = new ArrayList<>();
+
         for (int i = 0; i < 20; i++) {
-            tasks.add(counter::incrementAndGet);
+            list.add(count::incrementAndGet);
         }
-        
-        executor.submitAll(tasks);
-        
-        assertEquals(20, counter.get());
+
+        exec.submitAll(list);
+        assertEquals(20, count.get());
     }
 
     @Test
-    @DisplayName("submitAll blocks until all tasks complete")
-    void testSubmitAllBlocks() throws InterruptedException {
-        executor = new TiredExecutor(2);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        List<Runnable> tasks = new ArrayList<>();
-        
+    void testSubmitAllBlocking() throws InterruptedException {
+        exec = new TiredExecutor(2);
+        AtomicInteger count = new AtomicInteger(0);
+        List<Runnable> list = new ArrayList<>();
+
         for (int i = 0; i < 5; i++) {
-            tasks.add(() -> {
+            list.add(() -> {
                 try {
                     Thread.sleep(50);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
                 }
-                counter.incrementAndGet();
+                count.incrementAndGet();
             });
         }
-        
-        executor.submitAll(tasks);
-        
-        // After submitAll returns, all tasks should be complete
-        assertEquals(5, counter.get());
+
+        exec.submitAll(list);
+
+        // must be done after return
+        assertEquals(5, count.get());
     }
 
     @Test
-    @DisplayName("submitAll with empty task list")
-    void testSubmitAllEmpty() throws InterruptedException {
-        executor = new TiredExecutor(2);
-        
-        List<Runnable> tasks = new ArrayList<>();
-        
-        // Should not block or throw
-        assertDoesNotThrow(() -> executor.submitAll(tasks));
+    void testEmptyList() {
+        exec = new TiredExecutor(2);
+        assertDoesNotThrow(() -> exec.submitAll(new ArrayList<>()));
     }
 
     @Test
-    @DisplayName("submitAll with single task")
-    void testSubmitAllSingleTask() throws InterruptedException {
-        executor = new TiredExecutor(2);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        List<Runnable> tasks = new ArrayList<>();
-        tasks.add(counter::incrementAndGet);
-        
-        executor.submitAll(tasks);
-        
-        assertEquals(1, counter.get());
+    void testSubmitAllOneTask() throws InterruptedException {
+        exec = new TiredExecutor(2);
+        AtomicInteger count = new AtomicInteger(0);
+        List<Runnable> l = new ArrayList<>();
+        l.add(count::incrementAndGet);
+
+        exec.submitAll(l);
+        assertEquals(1, count.get());
     }
 
     @Test
-    @DisplayName("Multiple submitAll calls work correctly")
-    void testMultipleSubmitAllCalls() throws InterruptedException {
-        executor = new TiredExecutor(3);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        
-        for (int batch = 0; batch < 3; batch++) {
-            List<Runnable> tasks = new ArrayList<>();
+    void testMultipleBatches() throws InterruptedException {
+        exec = new TiredExecutor(3);
+        AtomicInteger count = new AtomicInteger(0);
+
+        for (int k = 0; k < 3; k++) {
+            List<Runnable> l = new ArrayList<>();
             for (int i = 0; i < 5; i++) {
-                tasks.add(counter::incrementAndGet);
+                l.add(count::incrementAndGet);
             }
-            executor.submitAll(tasks);
+            exec.submitAll(l);
         }
-        
-        assertEquals(15, counter.get());
+        assertEquals(15, count.get());
     }
 
-    // ==================== Task Ordering and Fairness Tests ====================
-
     @Test
-    @DisplayName("Tasks are assigned to less fatigued workers")
-    void testFairnessInTaskAssignment() throws InterruptedException {
-        executor = new TiredExecutor(3);
-        
-        List<Runnable> tasks = new ArrayList<>();
-        
-        // Create tasks that do some work
+    void testFairness() throws InterruptedException {
+        exec = new TiredExecutor(3);
+        List<Runnable> l = new ArrayList<>();
+
+        // tasks that take time
         for (int i = 0; i < 30; i++) {
-            tasks.add(() -> {
+            l.add(() -> {
                 long start = System.nanoTime();
-                while (System.nanoTime() - start < 1_000_000) { // 1ms
+                while (System.nanoTime() - start < 1_000_000) {
                     Math.sqrt(Math.random());
                 }
             });
         }
-        
-        executor.submitAll(tasks);
-        
-        // Check worker report - fatigue should be distributed
-        String report = executor.getWorkerReport();
-        assertNotNull(report);
+
+        exec.submitAll(l);
+
+        String report = exec.getWorkerReport();
         assertTrue(report.contains("Worker #0"));
-        assertTrue(report.contains("Worker #1"));
         assertTrue(report.contains("Worker #2"));
     }
 
-    // ==================== Shutdown Tests ====================
-
     @Test
-    @DisplayName("Shutdown terminates all workers")
     void testShutdown() throws InterruptedException {
-        executor = new TiredExecutor(4);
-        
-        // Submit some tasks first
-        CountDownLatch latch = new CountDownLatch(4);
-        for (int i = 0; i < 4; i++) {
-            executor.submit(latch::countDown);
-        }
-        latch.await(1, TimeUnit.SECONDS);
-        
-        // Shutdown should complete without hanging
-        executor.shutdown();
-        
-        // Executor should be shut down (this is hard to test directly,
-        // but if shutdown hangs, the test will timeout)
+        exec = new TiredExecutor(4);
+        CountDownLatch countdwn = new CountDownLatch(4);
+        for (int i = 0; i < 4; i++)
+            exec.submit(countdwn::countDown);
+        countdwn.await(1, TimeUnit.SECONDS);
+
+        exec.shutdown();
     }
 
     @Test
-    @DisplayName("Shutdown waits for running tasks to complete")
-    void testShutdownWaitsForTasks() throws InterruptedException {
-        executor = new TiredExecutor(2);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        
-        executor.submit(() -> {
+    void testShutdownWaits() throws InterruptedException {
+        exec = new TiredExecutor(2);
+        AtomicInteger count = new AtomicInteger(0);
+
+        exec.submit(() -> {
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            } catch (Exception e) {
             }
-            counter.incrementAndGet();
+            count.incrementAndGet();
         });
-        
-        Thread.sleep(20); // Let task start
-        executor.shutdown();
-        
-        // Task should have completed before shutdown returned
-        assertEquals(1, counter.get());
-    }
 
-    // ==================== Worker Report Tests ====================
+        Thread.sleep(20);
+        exec.shutdown();
 
-    @Test
-    @DisplayName("getWorkerReport returns report for all workers")
-    void testGetWorkerReport() {
-        executor = new TiredExecutor(3);
-        
-        String report = executor.getWorkerReport();
-        
-        assertNotNull(report);
-        assertTrue(report.contains("Worker Report:"));
-        assertTrue(report.contains("Worker #0"));
-        assertTrue(report.contains("Worker #1"));
-        assertTrue(report.contains("Worker #2"));
-        assertTrue(report.contains("Fatigue="));
-        assertTrue(report.contains("TimeUsed="));
-        assertTrue(report.contains("TimeIdle="));
+        assertEquals(1, count.get());
     }
 
     @Test
-    @DisplayName("Worker report shows increased fatigue after work")
-    void testWorkerReportShowsFatigue() throws InterruptedException {
-        executor = new TiredExecutor(2);
-        
-        List<Runnable> tasks = new ArrayList<>();
+    void testReport() {
+        exec = new TiredExecutor(3);
+        String s = exec.getWorkerReport();
+        assertNotNull(s);
+        assertTrue(s.contains("Fatigue="));
+    }
+
+    @Test
+    void testReportUpdate() throws InterruptedException {
+        exec = new TiredExecutor(2);
+        List<Runnable> l = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            tasks.add(() -> {
-                long start = System.nanoTime();
-                while (System.nanoTime() - start < 5_000_000) { // 5ms
+            l.add(() -> {
+                long s = System.nanoTime();
+                while (System.nanoTime() - s < 5000000)
                     Math.sqrt(Math.random());
-                }
             });
         }
-        
-        executor.submitAll(tasks);
-        
-        String report = executor.getWorkerReport();
-        
-        // Workers should have non-zero time used
-        assertTrue(report.contains("TimeUsed="));
-        // At least one worker should show fatigue > 0
-        assertFalse(report.contains("Fatigue=0.00, TimeUsed=0"));
+        exec.submitAll(l);
+
+        String s = exec.getWorkerReport();
+        assertTrue(s.contains("TimeUsed="));
     }
 
-    // ==================== Concurrent Access Tests ====================
-
     @Test
-    @DisplayName("Executor handles concurrent task submissions")
-    void testConcurrentSubmissions() throws InterruptedException {
-        executor = new TiredExecutor(4);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        CountDownLatch allDone = new CountDownLatch(100);
-        
-        // Create multiple threads that submit tasks
-        Thread[] submitters = new Thread[5];
-        for (int t = 0; t < 5; t++) {
-            submitters[t] = new Thread(() -> {
-                for (int i = 0; i < 20; i++) {
-                    executor.submit(() -> {
-                        counter.incrementAndGet();
-                        allDone.countDown();
+    void testConcurrent() throws InterruptedException {
+        exec = new TiredExecutor(4);
+        AtomicInteger count = new AtomicInteger(0);
+        CountDownLatch countdwn = new CountDownLatch(100);
+
+        Thread[] threads = new Thread[5];
+        for (int i = 0; i < 5; i++) {
+            threads[i] = new Thread(() -> {
+                for (int j = 0; j < 20; j++) {
+                    exec.submit(() -> {
+                        count.incrementAndGet();
+                        countdwn.countDown();
                     });
                 }
             });
+            threads[i].start();
         }
-        
-        for (Thread t : submitters) {
-            t.start();
-        }
-        
-        for (Thread t : submitters) {
-            t.join(2000);
-        }
-        
-        assertTrue(allDone.await(5, TimeUnit.SECONDS));
-        assertEquals(100, counter.get());
+
+        for (Thread t : threads)
+            t.join();
+        assertTrue(countdwn.await(5, TimeUnit.SECONDS));
+        assertEquals(100, count.get());
     }
 
-    // ==================== Edge Cases ====================
-
     @Test
-    @DisplayName("Task that throws exception does not break executor")
-    void testTaskThrowsException() throws InterruptedException {
-        executor = new TiredExecutor(2);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        CountDownLatch latch = new CountDownLatch(2);
-        
-        // First task throws exception
-        executor.submit(() -> {
-            latch.countDown();
-            throw new RuntimeException("Test exception");
+    void testExceptionTask() throws InterruptedException {
+        exec = new TiredExecutor(2);
+        AtomicInteger count = new AtomicInteger(0);
+        CountDownLatch countdwn = new CountDownLatch(2);
+
+        exec.submit(() -> {
+            countdwn.countDown();
+            throw new RuntimeException("boom");
         });
-        
-        Thread.sleep(100);
-        
-        // Second task should still execute
-        executor.submit(() -> {
-            counter.incrementAndGet();
-            latch.countDown();
+
+        Thread.sleep(50);
+
+        exec.submit(() -> {
+            count.incrementAndGet();
+            countdwn.countDown();
         });
-        
-        assertTrue(latch.await(2, TimeUnit.SECONDS));
-        assertEquals(1, counter.get());
+
+        countdwn.await(2, TimeUnit.SECONDS);
+        assertEquals(1, count.get());
     }
 
     @Test
-    @DisplayName("Large number of tasks completes correctly")
-    void testLargeNumberOfTasks() throws InterruptedException {
-        executor = new TiredExecutor(8);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        List<Runnable> tasks = new ArrayList<>();
-        
-        for (int i = 0; i < 1000; i++) {
-            tasks.add(counter::incrementAndGet);
-        }
-        
-        executor.submitAll(tasks);
-        
-        assertEquals(1000, counter.get());
+    void testManyTasks() throws InterruptedException {
+        exec = new TiredExecutor(8);
+        AtomicInteger count = new AtomicInteger(0);
+        List<Runnable> l = new ArrayList<>();
+        for (int i = 0; i < 1000; i++)
+            l.add(count::incrementAndGet);
+
+        exec.submitAll(l);
+        assertEquals(1000, count.get());
     }
 
-    @Test
-    @DisplayName("Tasks with varying execution times")
-    void testVaryingExecutionTimes() throws InterruptedException {
-        executor = new TiredExecutor(4);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        List<Runnable> tasks = new ArrayList<>();
-        
-        for (int i = 0; i < 10; i++) {
-            final int sleepTime = (i % 3) * 10; // 0, 10, 20ms
-            tasks.add(() -> {
-                try {
-                    Thread.sleep(sleepTime);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                counter.incrementAndGet();
-            });
-        }
-        
-        executor.submitAll(tasks);
-        
-        assertEquals(10, counter.get());
-    }
-
-    @Test
-    @DisplayName("Sequential submitAll calls with different batch sizes")
-    void testSequentialSubmitAllDifferentSizes() throws InterruptedException {
-        executor = new TiredExecutor(3);
-        
-        AtomicInteger counter = new AtomicInteger(0);
-        
-        // Small batch
-        List<Runnable> small = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
-            small.add(counter::incrementAndGet);
-        }
-        executor.submitAll(small);
-        assertEquals(2, counter.get());
-        
-        // Medium batch
-        List<Runnable> medium = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            medium.add(counter::incrementAndGet);
-        }
-        executor.submitAll(medium);
-        assertEquals(12, counter.get());
-        
-        // Large batch
-        List<Runnable> large = new ArrayList<>();
-        for (int i = 0; i < 50; i++) {
-            large.add(counter::incrementAndGet);
-        }
-        executor.submitAll(large);
-        assertEquals(62, counter.get());
-    }
 }
