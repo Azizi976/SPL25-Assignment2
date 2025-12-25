@@ -98,22 +98,28 @@ public class TiredThread extends Thread implements Comparable<TiredThread> {
                 // Record task start time for fatigue calculation
                 long taskStartTime = System.nanoTime();
 
-                // Execute the actual task
-                task.run();
+                // Try to execute run
+                try {
+                    task.run();
+                } catch (Exception e) {
+                    // If run made it, then update the fields
+                } finally {
 
-                // Accumulate CPU time used for fatigue calculation
-                timeUsed.addAndGet(System.nanoTime() - taskStartTime);
+                    // Accumulate CPU time used for fatigue calculation
+                    timeUsed.addAndGet(System.nanoTime() - taskStartTime);
 
-                // Mark worker as available for new tasks
-                busy.set(false);
+                    // Mark worker as available for new tasks
+                    busy.set(false);
 
-                // Start tracking idle time from now
-                this.idleStartTime.set(System.nanoTime());
+                    // Start tracking idle time from now
+                    this.idleStartTime.set(System.nanoTime());
+                }
 
             } catch (InterruptedException e) {
                 // Thread was interrupted while waiting - continue loop
             }
         }
+
     }
 
     @Override

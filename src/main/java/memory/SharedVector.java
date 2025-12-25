@@ -10,7 +10,10 @@ public class SharedVector {
 
     // Constructor
     public SharedVector(double[] vector, VectorOrientation orientation) {
-        this.vector = vector;
+        this.vector = new double[vector.length];
+        for (int i = 0; i < this.vector.length; i++){
+            this.vector[i] = vector[i];
+        }
         this.orientation = orientation;
     }
 
