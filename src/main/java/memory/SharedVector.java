@@ -8,8 +8,12 @@ public class SharedVector {
     private VectorOrientation orientation;
     private ReadWriteLock lock = new java.util.concurrent.locks.ReentrantReadWriteLock();
 
+    // Constructor
     public SharedVector(double[] vector, VectorOrientation orientation) {
-        this.vector = vector;
+        this.vector = new double[vector.length];
+        for (int i = 0; i < this.vector.length; i++){
+            this.vector[i] = vector[i];
+        }
         this.orientation = orientation;
     }
 
@@ -26,22 +30,28 @@ public class SharedVector {
     }
 
     public void writeLock() {
-        // TODO: acquire write lock
+        // Locking using ReadWrtieLock object lock function
+        lock.writeLock().lock();
     }
 
     public void writeUnlock() {
-        // TODO: release write lock
+        // Unlocking using ReadWrtieLock object unlock function
+        lock.writeLock().unlock();
     }
 
     public void readLock() {
-        // TODO: acquire read lock
+        // Locking using ReadWrtieLock object lock function
+        lock.readLock().lock();
     }
 
     public void readUnlock() {
-        // TODO: release read lock
+        // Unlocking using ReadWrtieLock object unlock function
+        lock.readLock().unlock();
     }
 
     public void transpose() {
+        // Cheking vectors orientation and changing the orientation according to the
+        // situation
         if (this.orientation == VectorOrientation.ROW_MAJOR) {
             this.orientation = VectorOrientation.COLUMN_MAJOR;
         } else {
@@ -50,6 +60,7 @@ public class SharedVector {
     }
 
     public void add(SharedVector other) {
+
         // Checking if the input is valid
         if (this.length() != other.length() || this.orientation != other.getOrientation()) {
             throw new IllegalArgumentException("SharedVectors must have the same length and orientation");
@@ -62,14 +73,15 @@ public class SharedVector {
     }
 
     public void negate() {
+
         // Negate the values of this vector
         for (int i = 0; i < this.length(); i++) {
             this.vector[i] = -1 * this.vector[i];
         }
-
     }
 
     public double dot(SharedVector other) {
+
         // Checking if the input is valid
         if (this.length() != other.length() || this.orientation != other.getOrientation()) {
             throw new IllegalArgumentException("SharedVectors must have the same length and orientation");
@@ -77,11 +89,13 @@ public class SharedVector {
 
         double result = 0;
 
-        // Add values of other vector to this vector
+        // Multiply values of other vector with the values of this vector
         for (int i = 0; i < this.length(); i++) {
             result += this.vector[i] * other.get(i);
         }
+
         return result;
+
     }
 
     public void vecMatMul(SharedMatrix matrix) {
@@ -91,7 +105,7 @@ public class SharedVector {
             int len = this.length();
             double[] result = new double[matrix.get(0).length()];
 
-            // Checking if multiplication is valud
+            // Checking if multiplication is valid
             if (matrix.length() != len) {
                 throw new IllegalArgumentException("Illegal multiplication");
             }
