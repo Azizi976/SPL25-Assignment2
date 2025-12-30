@@ -19,6 +19,7 @@ public class LinearAlgebraEngine {
     }
 
     public ComputationNode run(ComputationNode computationRoot) {
+        
         try {
             // While the root is not the resolved matrix, continue to compute
             while (computationRoot.getChildren() != null) {

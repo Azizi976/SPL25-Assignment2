@@ -122,9 +122,20 @@ public class LinearAlgebraEngineTest {
 
     @Test
     void testTranspose() {
-        double[][] m = { { 1, 2 } };
+        double[][] m = { { 1, 2, 3 }, { 4, 5, 6 } }; // 2x3
         double[][] res = lae.run(trN(m)).getMatrix();
-        assertEquals(2, res.length);
+
+        // Should be 3x2
+        assertEquals(3, res.length);
+        assertEquals(2, res[0].length);
+
+        // Check values
+        assertEquals(1.0, res[0][0]);
+        assertEquals(4.0, res[0][1]);
+        assertEquals(2.0, res[1][0]);
+        assertEquals(5.0, res[1][1]);
+        assertEquals(3.0, res[2][0]);
+        assertEquals(6.0, res[2][1]);
     }
 
     @Test
@@ -139,6 +150,24 @@ public class LinearAlgebraEngineTest {
 
         double[][] res = lae.run(neg).getMatrix();
         assertEquals(-3.0, res[0][0]);
+    }
+
+    @Test
+    void testDeepNesting() {
+        // ((A + B) * C) 
+        double[][] a = { { 1, 0 }, { 0, 1 } };
+        double[][] b = { { 1, 0 }, { 0, 1 } };
+        double[][] c = { { 2, 0 }, { 0, 2 } };
+
+        ComputationNode addNode = addN(a, b);
+        List<ComputationNode> mulList = new ArrayList<>();
+        mulList.add(addNode);
+        mulList.add(new ComputationNode(c));
+        ComputationNode mulNode = new ComputationNode(ComputationNodeType.MULTIPLY, mulList);
+
+        double[][] res = lae.run(mulNode).getMatrix();
+        assertEquals(4.0, res[0][0]);
+        assertEquals(4.0, res[1][1]);
     }
 
     @Test

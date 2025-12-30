@@ -18,6 +18,9 @@ public class Main {
       try{
         // Use parse function to get root
         ComputationNode root = parser.parse(args[1]);
+        
+        // Making sure that the tree is ready to compute
+        root.associativeNesting();
 
         // Get num of threads and change its type to int
         int treads = Integer.parseInt(args[0]);

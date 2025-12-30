@@ -20,6 +20,7 @@ public class SharedMatrix {
         }
     }
 
+    // We dont use the functions of acquire and release because in our implemtation it's not nedded  
     public void loadRowMajor(double[][] matrix) {
         // Updating the lentgh of vectors
         this.vectors = new SharedVector[matrix.length];
