@@ -19,13 +19,23 @@ public class LinearAlgebraEngine {
     }
 
     public ComputationNode run(ComputationNode computationRoot) {
-        // While the root is not the resolved matrix, continue to compute
-        while (computationRoot.getChildren() != null) {
-            // Find the first node to resolve
-            ComputationNode operator = computationRoot.findResolvable();
+        try {
+            // While the root is not the resolved matrix, continue to compute
+            while (computationRoot.getChildren() != null) {
+                // Find the first node to resolve
+                ComputationNode operator = computationRoot.findResolvable();
 
-            // Load and compute the opertator
-            loadAndCompute(operator);
+                // Load and compute the opertator
+                loadAndCompute(operator);
+            }
+        } finally {
+            // Try to shutdown excecutor and if cant throw an err
+            try {
+                this.executor.shutdown();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
         }
         return computationRoot;
     }
