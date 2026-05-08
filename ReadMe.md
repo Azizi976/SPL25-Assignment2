@@ -3,7 +3,7 @@
 ## Project Overview
 [cite_start]This project was developed as part of Assignment 2 in the Systems Programming (SPL) course at Ben-Gurion University of the Negev[cite: 1]. [cite_start]The system is a high-performance Linear Algebra Engine (LAE) implemented in Java, designed to execute complex matrix computations (Addition, Multiplication, Transpose, and Negation)[cite: 7, 9, 81, 85]. [cite_start]The core focus of this project is multi-threading, advanced synchronization techniques, and the implementation of a custom thread-pool architecture[cite: 7, 8].
 
-**Developers:** Tal Azizi & [Partner's Name]
+**Developers:** Tal Azizi & Ifat Nahmani
 
 ## Key Features & Technical Mechanisms
 [cite_start]The engine processes mathematical expressions represented as a JSON computation tree and parallelizes the tasks to maximize CPU utilization[cite: 71, 173, 174, 188].
